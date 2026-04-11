@@ -84,58 +84,6 @@ opkg install avahi-daemon avahi-utils
 /etc/init.d/avahi-daemon restart
 ```
 
-## 容器启停跟随打印机连接状态
-
-打印机长时间无任务会自动关机，重新开机后容器内的 CUPS 可能无法识别。通过监控脚本让容器启停自动跟随打印机的 USB 连接状态。
-
-创建 `/usr/local/monitor_hp_printer.sh`：
-
-> 请将 `PRINTER_USB_ID` 替换为你的打印机 USB ID，可通过 `lsusb` 命令查看。
-
-```bash
-#!/bin/sh
-
-# 打印机的 USB ID（通过 lsusb 查看）
-PRINTER_USB_ID="03f0:042a"
-
-# Docker 容器名称
-DOCKER_CONTAINER_NAME="cups_hp"
-
-# 检查打印机是否已连接
-printer_connected() {
-    lsusb | grep -q "$PRINTER_USB_ID"
-}
-
-# 主循环
-while true; do
-    if printer_connected; then
-        if ! docker ps | grep -q "$DOCKER_CONTAINER_NAME"; then
-            echo "打印机已连接，启动 Docker 容器..."
-            docker start "$DOCKER_CONTAINER_NAME"
-        fi
-    else
-        if docker ps | grep -q "$DOCKER_CONTAINER_NAME"; then
-            echo "打印机已断开，停止 Docker 容器..."
-            docker stop "$DOCKER_CONTAINER_NAME"
-        fi
-    fi
-    sleep 10
-done
-```
-
-设置权限并运行：
-
-```bash
-chmod +x /usr/local/monitor_hp_printer.sh
-/usr/local/monitor_hp_printer.sh &
-```
-
-开机自启动：编辑 `/etc/rc.local`，添加：
-
-```bash
-/usr/local/monitor_hp_printer.sh &
-```
-
 ## scanservjs 网页扫描服务
 
 基于 [scanservjs](https://github.com/sbs20/scanservjs) 官方镜像，补齐 HPLIP / hpaio / HP plugin，适配 HP M1136 等需要专有插件的 HP USB 一体机，通过浏览器即可发起扫描。
@@ -225,6 +173,34 @@ http://<宿主机IP>:8080
 **与 CUPS 打印容器共存：**
 
 两个容器可同时运行，但同一时间避免同时打印和扫描，因为底层共用同一台 USB 设备。
+
+## 容器启停跟随打印机连接状态
+
+打印机长时间无任务会自动关机，重新开机后容器内的 CUPS 可能无法识别。通过监控脚本让容器启停自动跟随打印机的 USB 连接状态。
+
+创建 `/usr/local/monitor_hp_printer.sh`：
+
+> 请将 `PRINTER_USB_ID` 替换为你的打印机 USB ID，可通过 `lsusb` 命令查看。
+
+
+设置权限并运行：
+
+```bash
+chmod +x /usr/local/monitor_hp_printer.sh
+/usr/local/monitor_hp_printer.sh &
+nohup /usr/local/monitor_hp_printer.sh > /dev/null 2>&1 &
+```
+
+开机自启动：编辑 `/etc/rc.local`，添加：
+
+```bash
+/usr/local/monitor_hp_printer.sh &
+```
+
+重启
+```bash
+kill $(pgrep -f monitor_hp_printer.sh)
+```
 
 ## 常见问题
 
