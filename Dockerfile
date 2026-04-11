@@ -9,6 +9,13 @@ LABEL maintainer="ysk666666@126.com"
 COPY cupsd.conf /root/cupsd.conf
 COPY install_hp_plugin.sh /root/install_hp_plugin.sh
 
+# 替换 apt 源为国内镜像（中科大 HTTP，slim 镜像无 ca-certificates 不能用 HTTPS）
+# 同时禁止 apt 跟随 HTTPS 重定向（防止镜像站强制跳转 HTTPS）
+RUN rm -f /etc/apt/sources.list.d/debian.sources && \
+    echo 'Acquire::https::Verify-Peer "false";' > /etc/apt/apt.conf.d/99no-ssl-verify && \
+    echo "deb http://mirrors.ustc.edu.cn/debian bookworm main" > /etc/apt/sources.list && \
+    echo "deb http://mirrors.ustc.edu.cn/debian bookworm-updates main" >> /etc/apt/sources.list && \
+    echo "deb http://mirrors.ustc.edu.cn/debian-security bookworm-security main" >> /etc/apt/sources.list
 
 # 更新包管理器并安装需要的软件
 RUN apt update && \
