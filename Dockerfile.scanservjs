@@ -1,0 +1,24 @@
+# 适配 HP M1136 的 scanservjs 镜像
+# 基于官方 scanservjs 镜像扩展 HPLIP / hpaio / HP plugin，
+# 让 HP LaserJet Professional M1136 MFP 这类 USB 一体机能在网页中扫描。
+FROM sbs20/scanservjs:latest
+
+USER root
+
+COPY install_hp_plugin.sh /root/install_hp_plugin.sh
+
+RUN set -eux; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -yq \
+        expect \
+        gnupg \
+        hplip \
+        libsane-hpaio \
+        sane-utils \
+        wget; \
+    chmod +x /root/install_hp_plugin.sh; \
+    expect /root/install_hp_plugin.sh; \
+    hp-plugin --status 2>&1 | tee /tmp/hp-plugin-status.log || true; \
+    rm -rf /var/lib/apt/lists/*
+
+EXPOSE 8080

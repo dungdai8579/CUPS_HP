@@ -136,6 +136,96 @@ chmod +x /usr/local/monitor_hp_printer.sh
 /usr/local/monitor_hp_printer.sh &
 ```
 
+## scanservjs 网页扫描服务
+
+基于 [scanservjs](https://github.com/sbs20/scanservjs) 官方镜像，补齐 HPLIP / hpaio / HP plugin，适配 HP M1136 等需要专有插件的 HP USB 一体机，通过浏览器即可发起扫描。
+
+与 CUPS 打印容器独立部署，互不干扰：
+
+| 容器 | 用途 | 端口 | Dockerfile |
+|------|------|------|------------|
+| `cups_hp` | 打印 | `631` | `Dockerfile` |
+| `scanservjs_m1136` | 扫描 | `8080` | `Dockerfile.scanservjs` |
+
+### 构建镜像
+
+```bash
+docker build -f Dockerfile.scanservjs -t scanservjs_m1136:latest .
+```
+
+### 启动容器
+
+```bash
+mkdir -p /mnt/mmc0-4/scans
+docker rm -f scanservjs_m1136 2>/dev/null || true
+
+docker run -d \
+  --name scanservjs_m1136 \
+  --privileged \
+  --device /dev/bus/usb \
+  -p 8080:8080 \
+  -v /var/run/dbus:/var/run/dbus \
+  -v /mnt/mmc0-4/scans:/var/lib/scanservjs/output \
+  --restart unless-stopped \
+  scanservjs_m1136:latest
+```
+
+> `/mnt/mmc0-4/scans` 为扫描文件在宿主机上的保存目录，可按需修改。
+
+### 验证扫描头
+
+```bash
+docker exec -it scanservjs_m1136 scanimage -L
+```
+
+正常输出：
+
+```text
+device `hpaio:/usb/HP_LaserJet_Professional_M1136_MFP?...` is a Hewlett-Packard HP_LaserJet_Professional_M1136_MFP all-in-one
+```
+
+### 网页使用
+
+浏览器访问：
+
+```
+http://<宿主机IP>:8080
+```
+
+同一局域网内的 macOS、Windows、iPhone/iPad 等设备均可访问。
+
+- 点击 **扫描** 按钮发起扫描（"预览"仅更新预览图，不会保存文件）
+- 扫描完成后，点击右上角 **文件** 可下载 PNG/JPG/PDF
+- 宿主机上的文件保存在启动时挂载的目录：`/mnt/mmc0-4/scans`
+
+### 扫描常见问题
+
+**scanimage -L 看不到设备：**
+
+- 确认容器启动时带了 `--privileged` 和 `--device /dev/bus/usb`
+- 确认打印机已通电并通过 USB 连接到宿主机（`lsusb` 可验证）
+
+**扫描后"文件"里没有文件：**
+
+1. 确认点的是"扫描"而非"预览"
+2. 放开输出目录权限后重启容器：
+
+   ```bash
+   chmod 777 /mnt/mmc0-4/scans
+   docker restart scanservjs_m1136
+   ```
+
+3. 查看容器日志定位报错：
+
+   ```bash
+   docker logs --tail=200 scanservjs_m1136
+   ```
+4. 实测 HP M1136 在此系统下扫描的分辨率最大为200
+
+**与 CUPS 打印容器共存：**
+
+两个容器可同时运行，但同一时间避免同时打印和扫描，因为底层共用同一台 USB 设备。
+
 ## 常见问题
 
 ### PDF/图片打印极慢（Word 正常）
@@ -178,6 +268,7 @@ Dockerfile 锁定使用 `debian:bookworm-slim`（Debian 12）而非 `debian:stab
 - [HPLIP 官方下载](https://developers.hp.com/hp-linux-imaging-and-printing/gethplip)
 - [HPLIP 源码](https://sourceforge.net/projects/hplip/files/hplip/)
 - [HPLIP Plugin 下载](https://www.openprinting.org/download/printdriver/auxfiles/HP/plugins/)
+- [scanservjs GitHub](https://github.com/sbs20/scanservjs)
 - [原理参考](https://enita.cn/2022/0622/9bfa6627568d/)
 - [虚拟机安装参考 1](https://post.smzdm.com/p/a905p290/)
 - [虚拟机安装参考 2](https://www.zhoujie218.top/archives/2537.html)
