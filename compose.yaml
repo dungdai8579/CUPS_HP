@@ -1,0 +1,27 @@
+services:
+  cups-hp:
+    # 若作者未在 Docker Hub 发布预编译镜像，可先 git clone 仓库到本地，取消下面 build 的注释并注释掉 image
+    build: .
+    #image: ysk666666/cups_hp:latest
+    container_name: cups-hp
+    restart: unless-stopped
+    
+    # 必须使用 host 网络模式，确保局域网内的 Avahi/mDNS 广播正常，使 iOS AirPrint 和电脑能自动发现打印机
+    network_mode: host
+    
+    # 赋予特权模式或挂载 USB 总线，确保容器能识别物理连接的 USB 惠普打印机
+    privileged: true
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+      
+    environment:
+      - TZ=Asia/Hong_Kong
+      # 注意：具体的管理员账号密码环境变量名（如 CUPSADMIN / CUPSPASSWORD）需以原仓库 Dockerfile 为准
+      - CUPSADMIN=admin
+      - CUPSPASSWORD=admin
+      
+    volumes:
+      # 持久化保存打印机配置与驱动状态
+      - ./cups-config:/etc/cups
+      # 挂载宿主机 D-Bus（部分基于 Debian 的 Avahi/CUPS 镜像需要此项以正常广播服务）
+      - /var/run/dbus:/var/run/dbus
